@@ -11,7 +11,7 @@ use encoding::{Encoding, DecoderTrap};
 use encoding::all::WINDOWS_31J;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::SeekFrom;
+use std::io::{SeekFrom, Cursor};
 use crate::vmd_reader::{read_string};
 use crate::common::{read_items, read_fix_items, read_float3, read_float4};
 use crate::motion::{BoneKeyframe, MorphKeyframe, Motion};
@@ -19,14 +19,16 @@ use std::collections::HashMap;
 
 const PMM_HEADER: &str = "Polygon Movie maker 0002";
 
-fn read_v_string(file: &mut File) -> String {
+fn read_v_string<T>(file: &mut T) -> String
+    where T: Read {
     let len = file.read_u8().unwrap() as usize;
     let mut string_raw = vec![0u8; len];
     file.read(&mut string_raw).unwrap();
     WINDOWS_31J.decode(&string_raw, DecoderTrap::Ignore).unwrap()
 }
 
-pub fn read_header(mut file: &mut File) {
+pub fn read_header<T>(mut file: &mut T)
+        where T: Read {
     let header_string = read_string(&mut file, 30);
     assert!(header_string.starts_with(PMM_HEADER));
     let view_width = file.read_u32::<LittleEndian>().unwrap();
@@ -43,7 +45,8 @@ pub fn read_header(mut file: &mut File) {
     let self_shadow_panel = file.read_u8().unwrap() == 1 ;
     let selected_model_index = file.read_u8().unwrap();
 }
-pub fn read_model(mut file: &mut File) -> Motion {
+pub fn read_model<T>(mut file: &mut T) -> Motion
+    where T: Read {
     let number = file.read_u8().unwrap();
     let name = read_v_string(&mut file);
     let name_en = read_v_string(&mut file);
@@ -168,8 +171,9 @@ pub fn read_model(mut file: &mut File) -> Motion {
     }
 }
 
-pub fn read_bone_frame(mut file: &mut File,
-                       keyframes: &mut HashMap<u32, BoneKeyframe>, names: &Vec<String>) {
+pub fn read_bone_frame<T>(mut file: &mut T,
+                       keyframes: &mut HashMap<u32, BoneKeyframe>, names: &Vec<String>)
+    where T: Read {
     let data_index = if keyframes.len() < names.len() {
         keyframes.len() as u32
     } else {
@@ -208,8 +212,9 @@ pub fn read_bone_frame(mut file: &mut File,
     });
 }
 
-pub fn read_morph_frame(file: &mut File,
-                         keyframes: &mut HashMap<u32, MorphKeyframe>, names: &Vec<String>) {
+pub fn read_morph_frame<T>(file: &mut T,
+                         keyframes: &mut HashMap<u32, MorphKeyframe>, names: &Vec<String>)
+    where T: Read {
     let data_index = if keyframes.len() < names.len() {
         keyframes.len() as u32
     } else {
@@ -229,7 +234,8 @@ pub fn read_morph_frame(file: &mut File,
         weight,
     });
 }
-pub fn read_op_frame(mut file: &mut File, ik_count: usize, op_count: usize, inited: bool) {
+pub fn read_op_frame<T>(mut file: &mut T, ik_count: usize, op_count: usize, inited: bool)
+    where T: Read {
     let data_index = if inited { -1 } else { file.read_i32::<LittleEndian>().unwrap() };
     let frame = file.read_u32::<LittleEndian>().unwrap();
     let pre_index = file.read_u32::<LittleEndian>().unwrap();
@@ -245,14 +251,16 @@ pub fn read_op_frame(mut file: &mut File, ik_count: usize, op_count: usize, init
     let selected = file.read_u8().unwrap() == 1;
 }
 
-fn read_op_current_data(file: &mut File) {
+fn read_op_current_data<T>(file: &mut T)
+    where T: Read {
     let key_frame_begin = file.read_u32::<LittleEndian>().unwrap();
     let key_frame_end = file.read_u32::<LittleEndian>().unwrap();
     let model_index = file.read_u32::<LittleEndian>().unwrap();
     let parent_bone_index = file.read_u32::<LittleEndian>().unwrap();
 }
 
-fn read_bone_current_data(mut file: &mut File) {
+fn read_bone_current_data<T>(mut file: &mut T)
+    where T: Read {
     let trans = read_float3(&mut file);
     let rot = read_float4(&mut file);
     let edit_un_commited = file.read_u8().unwrap() == 1;
@@ -261,7 +269,8 @@ fn read_bone_current_data(mut file: &mut File) {
 }
 
 pub fn read_pmm(path: &Path) -> Vec<Motion> {
-    let mut file = File::open(path).unwrap();
+    let content = fs::read(path).unwrap();
+    let mut file = Cursor::new(content);
     read_header(&mut file);
     let count = file.read_u8().unwrap() as usize;
     read_fix_items(&mut file, count, read_model)

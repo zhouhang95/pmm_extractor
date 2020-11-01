@@ -1,8 +1,10 @@
 use std::fs::File;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Read, Write};
 
-pub fn read_float3(file: &mut File) -> [f32; 3] {
+pub fn read_float3<T>(file: &mut T) -> [f32; 3]
+    where T: Read {
     let x = file.read_f32::<LittleEndian>().unwrap();
     let y = file.read_f32::<LittleEndian>().unwrap();
     let z = file.read_f32::<LittleEndian>().unwrap();
@@ -14,7 +16,8 @@ pub fn write_float3(file: &mut File, [x, y, z]: [f32; 3]) {
     file.write_f32::<LittleEndian>(z).unwrap();
 }
 
-pub fn read_float4(file: &mut File) -> [f32; 4] {
+pub fn read_float4<T>(file: &mut T) -> [f32; 4]
+    where T: Read {
     let x = file.read_f32::<LittleEndian>().unwrap();
     let y = file.read_f32::<LittleEndian>().unwrap();
     let z = file.read_f32::<LittleEndian>().unwrap();
@@ -28,14 +31,18 @@ pub fn write_float4(file: &mut File, [x, y, z, w]: [f32; 4]) {
     file.write_f32::<LittleEndian>(w).unwrap();
 }
 
-pub fn read_items<T, F>(mut file: &mut File, f: F) -> Vec<T>
-    where F: Fn(&mut File) -> T {
-    let count = file.read_u32::<LittleEndian>().unwrap();
-    read_fix_items(&mut file, count as usize, f)
+pub fn read_items<R, T, F>(file: &mut R, f: F) -> Vec<T>
+    where R: Read, F: Fn(&mut R) -> T {
+    let count = file.read_u32::<LittleEndian>().unwrap() as usize;
+    let mut items: Vec<T> = Vec::with_capacity(count);
+    for _ in 0..count {
+        items.push(f(file));
+    }
+    items
 }
 
-pub fn read_fix_items<T, F>(file: &mut File, count: usize, f: F) -> Vec<T>
-    where F: Fn(&mut File) -> T {
+pub fn read_fix_items<R, T, F>(file: &mut R, count: usize, f: F) -> Vec<T>
+    where R: Read, F: Fn(&mut R) -> T {
     let mut items: Vec<T> = Vec::with_capacity(count);
     for _ in 0..count {
         items.push(f(file));

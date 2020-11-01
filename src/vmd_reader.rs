@@ -20,7 +20,8 @@ use crate::common::*;
 const VERSION_1: &str = "Vocaloid Motion Data file";
 pub const VERSION_2: &str = "Vocaloid Motion Data 0002";
 
-pub fn read_string(file: &mut File, len: usize) -> String {
+pub fn read_string<T>(file: &mut T, len: usize) -> String
+        where T: Read {
     let mut string_raw = vec![0u8; len];
     file.read(&mut string_raw).unwrap();
     WINDOWS_31J.decode(&string_raw, DecoderTrap::Ignore).unwrap()
